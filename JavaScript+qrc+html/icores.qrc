@@ -1,0 +1,23 @@
+<RCC>
+    <qresource prefix="/Menu">
+        <file>IconRes/Contact.ico</file>
+        <file>IconRes/Gear.ico</file>
+        <file>IconRes/Power.ico</file>
+        <file>IconRes/Search.ico</file>
+        <file>IconRes/Television-Alt.ico</file>
+        <file>IconRes/Wrench.ico</file>
+        <file>IconRes/Pen.ico</file>
+        <file>IconRes/ruler.ico</file>
+        <file>IconRes/GPS.ico</file>
+        <file>IconRes/erase.ico</file>
+        <file>IconRes/locate.ico</file>
+        <file>IconRes/pin.ico</file>
+        <file>IconRes/CarGIF.gif</file>
+    </qresource>
+    <qresource prefix="/">
+        <file>IconRes/Earth.ico</file>
+        <file alias="map">gdmap.html</file>
+        <file alias="js">qwebchannel.js</file>
+        <file alias="time">time.html</file>
+    </qresource>
+</RCC>

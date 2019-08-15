@@ -1,0 +1,518 @@
+<!doctype html>
+<html>
+<head>
+	<meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="initial-scale=1.0, user-scalable=no, width=device-width>   
+    <link rel="stylesheet" href="https://a.amap.com/jsapi_demos/static/demo-center/css/demo-center.css" />
+	<base href="//webapi.amap.com/ui/1.0/ui/overlay/SimpleInfoWindow/examples/" />
+    <style>
+        html,
+        body,
+        #container {
+          width: 100%;
+          height: 100%;
+		  margin:0px;
+        }
+    </style>
+	<title>地图显示</title>
+	<div id="container"></div>
+</head>
+
+
+<body>
+<body scroll="no">
+<!-- 加载QT的脚本 -->
+<script type="text/javascript" src="E:/CarSys/qwebchannel.js"></script>
+
+<!-- 加载地图脚本 -->
+<script	type="text/javascript" src="https://webapi.amap.com/maps?v=1.4.14&key=33c3153d8e56c9901c4e7c356522c4c7&plugin=AMap.Geocoder,AMap.Autocomplete,AMap.MouseTool,AMap.Driving"></script>
+
+
+<script type="text/javascript">
+	
+    var map = new AMap.Map('container', {
+        resizeEnable: true, //是否监控地图容器尺寸变化
+        zoom:11, //初始化地图层级
+        center: [113.280637,23.125178] //初始化地图中心点
+		
+    });
+	
+	//交通路况图层
+	var trafficLayer = new AMap.TileLayer.Traffic({
+        zIndex: 10
+    });
+	
+	// 构造官方卫星、路网图层
+    var satelliteLayer = new AMap.TileLayer.Satellite();
+    var roadNetLayer =  new AMap.TileLayer.RoadNet();
+
+	
+    // 实例化点标记
+    function addMarker(lng,lat,item) {
+        marker = new AMap.Marker({
+            icon: "E:/CarSys/IconRes/car.png",
+            position: [lng,lat],
+            offset: new AMap.Pixel(-7, -24)
+        });
+        marker.setMap(map);
+		markers.push(item);
+    }
+	
+    function updateIcon() {
+        marker.setIcon('E:/CarSys/IconRes/pin.ico');
+		marker.setOffset(new AMap.Pixel(-24, -24));
+    }
+
+    function updateContent(lng,lat) {
+        if (!marker) {
+            return;
+        }
+        // 自定义点标记内容
+        var markerContent = document.createElement("div");
+
+        // 点标记中的图标
+        //var markerImg = document.createElement("img");
+        //markerImg.className = "markerlnglat";
+        //markerImg.src = "//a.amap.com/jsapi_demos/static/demo-center/icons/poi-marker-red.png";
+        //markerContent.appendChild(markerImg);
+
+        // 点标记中的文本
+        var markerSpan = document.createElement("span");
+        markerSpan.className = 'marker';
+        markerSpan.innerHTML = "Hi，我被更新啦！";
+        markerContent.appendChild(markerSpan);
+
+        marker.setContent(markerContent); //更新点标记内容
+        marker.setPosition([lng, lat]); //更新点标记位置
+    }
+
+    // 清除 marker
+    function clearMarker() {
+
+        if (marker) {
+            marker.setMap(null);
+            marker = null;
+        }
+    }
+	// 清除多个 marker
+	function removeMarkers(){
+        map.remove(markers);
+    }
+	
+	//marker 点击时打开
+    //AMap.event.addListener(marker, 'click', function() {
+    //                  your function
+    //});
+	
+	//地图主题设置
+	function setMapStyle(mcolor) {
+      var styleName = "amap://styles/" + mcolor
+      map.setMapStyle(styleName);
+    }
+	
+	//划线操作
+	function drawPolyline (start_lng,start_lat,end_lng,end_lat) {
+		var path = [
+			new AMap.LngLat(start_lng,start_lat),
+			new AMap.LngLat(end_lng,end_lat)
+		]
+	
+		var polyline = new AMap.Polyline({
+			path: path,  
+			borderWeight: 2, // 线条宽度，默认为 1
+			strokeColor: 'red', // 线条颜色
+			strokeOpacity: 1,
+			strokeWeight: 4,//线的粗细
+			strokeStyle: "solid",//线的形式
+			lineJoin: 'round' // 折线拐点连接处样式
+		});
+		
+		map.add(polyline);
+    }
+	
+	//测距操作
+	function checkdistance(start_lng,start_lat,end_lng,end_lat){
+		var p1 = [start_lng,start_lat];
+		var p2 = [end_lng,end_lat];
+		var dis = AMap.GeometryUtil.distance(p1, p2);//计算两点距离
+		dis = Math.round(dis);//四舍五入
+		drawPolyline (start_lng,start_lat,end_lng,end_lat);//两点间划线
+		var discontent;
+		if(dis>=10000){
+			dis = dis/1000;
+			discontent = "两点间距离为："+dis+ "公里。"
+		}
+		else discontent = "两点间距离为："+dis+ "米。"
+		var infoWindow = new AMap.InfoWindow({
+		    anchor: 'top-right',
+			content:discontent
+		});
+		infoWindow.open(map,p1);
+		
+	}
+	
+	
+	var drivingOption = {
+        policy: AMap.DrivingPolicy.LEAST_TIME, // 最短路径策略，其它policy参数请参考 
+		//https://lbs.amap.com/api/javascript-api/reference/route-search#m_DrivingPolicy
+        ferry: 0, // 是否可以使用轮渡
+        province: '粤', // 车牌省份的汉字缩写  
+		hideMarkers: true//隐藏标记点
+    }
+	
+
+    // 构造路线导航类
+    var driving = new AMap.Driving(drivingOption);
+	
+	function mydraw(lng1,lat1,lng2,lat2){
+		driving.search(new AMap.LngLat(lng1,lat1), new AMap.LngLat(lng2,lat2), function(status, result) {
+        // result即是对应的驾车导航信息，相关数据结构文档请参考
+		//https://lbs.amap.com/api/javascript-api/reference/route-search#m_DrivingResult
+        if (status === 'complete') {
+            if (result.routes && result.routes.length) {
+                // 绘制第一条路线，也可以按需求绘制其它几条路线								
+                drawRoute(result.routes[0])
+                //log.success('绘制驾车路线完成')
+            }
+        } 
+		else 
+            alert('获取驾车数据失败：' + result)     
+		});
+	}
+	
+	//数据模拟函数
+	function mysimulate(start_lng,start_lat,end_lng,end_lat){
+		driving.search(new AMap.LngLat(start_lng,start_lat), new AMap.LngLat(end_lng,end_lat), function(status, result) {
+			if (status === 'complete') {
+				if (result.routes && result.routes.length) {
+                //routes[]数组里面包含了若干条线路，选择一条进行解析			
+				parseRouteToPath(result.routes[0]);
+				
+                //drawRoute(result.routes[0])不在地图上划线
+                //log.success('绘制驾车路线完成')
+				}
+			} 
+		else 
+            alert('模拟驾车数据失败：' + result)     
+		});
+	}
+	
+	//用到的所有数据
+	var myorientation = new Array();
+	var mydistance = new Array();
+	var mystart = new Array();
+	var myend = new Array();
+	var mytime = new Array();
+	var mypath = new Array();
+	var address = new Array();
+	
+	// 解析DrivingRoute对象，构造成AMap.Polyline的path参数需要的格式
+    // DrivingResult对象结构参考文档 https://lbs.amap.com/api/javascript-api/reference/route-search#m_DriveRoute
+	function parseRouteToPath(route) {
+        var path = []		
+        for (var i = 0, l = route.steps.length; i < l; i++) {//routr数组里面包含sheps数组
+            var step = route.steps[i]//类型别名
+			
+			myorientation.push(step.orientation);
+			mydistance.push(step.distance);
+			mystart.push(step.start_location);
+			myend.push(step.end_location);
+			mytime.push(step.time);
+			
+            for (var j = 0, n = step.path.length; j < n; j++) {//steps数组里面包含path数组				
+				path.push(step.path[j])
+            }
+        }
+		//alert('数据模拟完毕'+mystart.length + myend.length + mydistance.length + myorientation.length + mytime.length);		
+        return path
+    }
+	 
+	
+	//绘制行驶路线
+	function drawRoute (route) {
+        var path = parseRouteToPath(route)
+
+        var startMarker = new AMap.Marker({
+            position: path[0],
+            icon: 'https://webapi.amap.com/theme/v1.3/markers/n/start.png',
+            map: map
+        })
+
+        var endMarker = new AMap.Marker({
+            position: path[path.length - 1],
+            icon: 'https://webapi.amap.com/theme/v1.3/markers/n/end.png',
+            map: map
+        })
+
+        var routeLine = new AMap.Polyline({
+            path: path,
+            isOutline: true,
+            outlineColor: '#ffeeee',
+            borderWeight: 2,
+            strokeWeight: 5,
+            strokeColor: '#0091ff',
+            lineJoin: 'round'
+        })
+
+        routeLine.setMap(map)
+        // 调整视野达到最佳显示区域
+        map.setFitView([ startMarker, endMarker, routeLine ])
+	}
+	
+	function myRoute (route) {
+        var path = route;
+
+        var startMarker = new AMap.Marker({
+            position: path[0],
+            icon: 'https://webapi.amap.com/theme/v1.3/markers/n/start.png',
+            map: map
+        })
+
+        var endMarker = new AMap.Marker({
+            position: path[path.length - 1],
+            icon: 'https://webapi.amap.com/theme/v1.3/markers/n/end.png',
+            map: map
+        })
+
+        var routeLine = new AMap.Polyline({
+            path: path,
+            isOutline: true,
+            outlineColor: '#ffeeee',
+            borderWeight: 2,
+            strokeWeight: 5,
+            strokeColor: '#0091ff',
+            lineJoin: 'round'
+        })
+
+        routeLine.setMap(map)
+        // 调整视野达到最佳显示区域
+        map.setFitView([ startMarker, endMarker, routeLine ])
+	}
+    
+	//构造地理编码对象
+	var geocoder = new AMap.Geocoder();
+	
+	function regeoCode(lng,lat) {      				
+		geocoder.getAddress(new AMap.LngLat(lng,lat), function(status, result) {
+			if (status === 'complete'&&result.regeocode) 
+                address.push(result.regeocode.formattedAddress);//逆地理编码得到的值               				            
+			else
+				alert(JSON.stringify(result))						
+        });		
+    }
+	
+	function clearAll(){
+		myorientation = [];
+		mydistance = [];
+		mystart = [];
+		myend = [];
+		mytime = [];
+		mypath = [];
+		address = [];
+	}
+	
+	//创建右键菜单
+    var contextMenu = new AMap.ContextMenu();
+    //右键放大
+    contextMenu.addItem("放大一级", function () {
+        map.zoomIn();
+    }, 0);
+    //右键缩小
+    contextMenu.addItem("缩小一级", function () {
+        map.zoomOut();
+    }, 1);
+    //右键添加Marker标记
+    contextMenu.addItem("添加标记", function (e) {
+        var marker = new AMap.Marker({
+            map: map,
+            position: contextMenuPositon //基点位置
+        });
+    }, 2);
+
+    //地图绑定鼠标右击事件——弹出右键菜单
+    map.on('rightclick', function (e) {
+        contextMenu.open(map, e.lnglat);
+        contextMenuPositon = e.lnglat;
+    });
+        
+	
+	//地图点击事件
+	var markers = new Array();
+	
+    map.on('click',function(e) {
+        lng = e.lnglat.getLng(); 
+		lat = e.lnglat.getLat();			
+		addMarker(lng,lat,markers);
+		updateIcon();
+    });
+	
+	//地图加载完毕事件
+	map.on('complete', function() {
+		var res = '地图图块加载完毕！当前地图中心点为：'+ map.getCenter();
+        console.log(res);
+		});
+	
+	//地图拖拽事件
+	map.on('dragend', function(e) {
+		
+	});
+	
+	//QT和JS连接重要部分	
+	window.onload = function() {
+		    var socket = new WebSocket('ws://localhost:12345');//建立一个本地websocket，端口号是12345
+			socket.onerror = function (error) {
+				alert("WebSocket连接发生错误");
+			}
+			socket.onclose = function() {
+                console.error("web channel closed");
+            };           
+            socket.onopen = function() {
+				//console.log("WebSocket成功建立连接！");
+				//console.log("Webchannel未建立！");
+				
+				new QWebChannel(socket, function(channel) {
+					//console.log("Webchannel建立！");
+					var QT = channel.objects.qtserver;//相当于C++里面的using或者typedef声明
+
+					//点击标点功能
+					map.on('click', function(e) {
+						var lnglat = map.getCenter();
+						var lng = e.lnglat.getLng(); 
+						var lat = e.lnglat.getLat();
+						QT.mapdebug(lng,lat);
+					}); 
+					//定位功能
+					QT.sig_locate.connect(function (jd,wd){//收到sig_locate信号就调用函数
+						var res = 'position:' + jd + wd;
+						map.setCenter(new AMap.LngLat(jd,wd));
+					});
+					
+					//快速定位功能
+					QT.sig_getcent.connect(function (jd,wd){//收到sig_getcent信号就调用函数
+						var cent = map.getCenter();
+						var lat = cent.getLat();
+						var lng = cent.getLng();
+						QT.showplus(lng,lat);
+					});										
+					
+					var traffic_stat = false;//交通图层状态量
+					QT.sig_mapswitchtraffic.connect(function (){//收到sig_mapswitchtraffic信号就调用函数
+						QT.ok();
+						if(traffic_stat==false){
+							map.add(trafficLayer);//添加交通图层
+							trafficLayer.show();
+							traffic_stat = true;
+						}
+						else{
+							map.remove(trafficLayer);//移除交通图层
+							traffic_stat = false;
+						}
+					});
+					
+					var satellite_stat = false;//卫星图层状态量
+					QT.sig_mapswitchsatellite.connect(function (){//收到sig_mapswitchsatellite信号就调用函数
+						QT.ok();
+						if(satellite_stat==false){
+							map.add(satelliteLayer);//添加卫星图层						
+							satellite_stat = true;
+						}
+						else{
+							map.remove(satelliteLayer);//移除卫星图层
+							satellite_stat = false;
+						}
+					});
+					
+					var roadnet_stat = false;//路网图层状态量
+					QT.sig_mapswitchroadnet.connect(function (){//收到sig_mapswitchroadnet信号就调用函数
+						QT.ok();
+						if(roadnet_stat==false){
+							map.add(roadNetLayer);//添加路网图层						
+							roadnet_stat = true;
+						}
+						else{
+							map.remove(roadNetLayer);//移除路网图层
+							roadnet_stat = false;
+						}
+					});
+					
+					QT.sig_mapswitchtheme.connect(function (color){//收到sig_mapswitchtheme信号就调用函数变换主题
+						QT.ok();
+						setMapStyle(color);
+					});					
+					
+					QT.sig_drawline.connect(function (){//收到sig_drawline信号就调用函数划线
+						QT.ok();
+						drawPolyline();
+					});
+					
+					QT.sig_checkdis.connect(function (start_lng,start_lat,end_lng,end_lat){//收到sig_checkdis信号就调用函数测距
+						QT.ok();
+						checkdistance(start_lng,start_lat,end_lng,end_lat);
+					});
+					
+					QT.sig_erase.connect(function (){//收到sig_erase信号就调用函数擦除覆盖物
+						QT.ok();
+						map.clearMap();
+					});
+					
+					QT.sig_getroute.connect(function (start_lng,start_lat,end_lng,end_lat){//收到sig_getroute信号就调用函数规划路径
+						QT.ok();
+						mydraw(start_lng,start_lat,end_lng,end_lat);											
+					});					
+					
+					QT.sig_simulate.connect(function(start_lng,start_lat,end_lng,end_lat){
+						//收到模拟信号，注意给数组赋值需要一定时间						
+						mysimulate(start_lng,start_lat,end_lng,end_lat);//里面调用了parseRouteToPath给五个数组赋值
+						alert('数据模拟完成！');//起阻塞作用，保证数组构造完整
+						//如果获得的数据不完整
+						if(mystart.length==0 || myend.length==0 || mydistance.length==0 || myorientation.length==0 || mytime.length==0){
+							QT.error();
+							clearAll();
+						}							
+						else{
+							QT.sendStart(mystart);
+							QT.sendEnd(myend);
+							QT.sendDistance(mydistance);
+							QT.sendOrientation(myorientation);
+							QT.sendTime(mytime);							
+							QT.initDone();//QT端等待sig_initDone信号才开始执行模拟																						
+						}	
+					});			
+										
+					QT.sig_regeo.connect(function (lng,lat){//收到sig_getroute信号就调用函数逆地理编码
+						//QT.ok();						
+						var res = regeoCode(lng,lat);//求出结果，存入address数组
+						addMarker(lng,lat);	//地图上标记点	
+						mypath.push(new AMap.LngLat(lng,lat));
+						//QT.regeoDone(address);//调用函数返回给QT端
+					});
+					
+					QT.sig_insertDone.connect(function(){//收到sig_insertDone信号就调用说明插入数据完成
+						if(address.length!=0){
+							QT.sendLocation(address);//发回address数组给QT端
+							myRoute(mypath);//画出我的路线
+							//alert('地理位置数组已经发送');
+						}													
+						//清空数组
+						mypath = [];
+						address = [];
+					});
+					
+					QT.sig_clean.connect(function(){//收到QT的处理完毕一切数据后就执行清除				
+						clearAll();																																		
+					});					
+					
+                });
+            }
+        }
+		
+
+</script>
+
+
+</body>
+</html>
+
+
+
